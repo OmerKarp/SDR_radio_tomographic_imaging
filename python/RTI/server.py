@@ -14,7 +14,7 @@ import threading
 # -----------------------------
 NODE_COUNT = 2
 NODE_IDS = [1,2]
-SDR_IPS = ["192.168.20.35", "192.168.20.25"]  # Node IPs
+SDR_IPS = ["192.168.20.35", "192.168.20.37"]  # Node IPs
 FRAME_TIME = 0.05  # Tx rotation
 SERVER_PORT = 9000
 SCHED_PORT = 9001

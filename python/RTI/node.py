@@ -49,6 +49,7 @@ class rssi_sender(gr.sync_block):
 
         # Compute ΔRSSI
         delta = np.mean(rssi_samples) - self.baseline
+        print(f"[NODE {self.node_id}] TX={self.is_tx} ΔRSSI={delta:.2f}")
 
         # Send only if Tx
         if self.is_tx and (now - self.last_send > 0.02):
@@ -84,6 +85,7 @@ if __name__ == "__main__":
     # Simulate incoming RSSI (replace with SDR input in GNURadio flow)
     print("Node running... sending simulated RSSI.")
     while True:
-        fake_rssi = np.random.normal(-50, 1, 100)  # 100 samples per batch
+        fake_rssi = np.random.normal(-50 + NODE_ID * 5, 1, 100)
+
         block.work([fake_rssi], None)
         time.sleep(0.01)

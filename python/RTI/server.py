@@ -27,7 +27,8 @@ LAMBDA = 0.1
 # -----------------------------
 rssi_matrix = np.zeros((NODE_COUNT, NODE_COUNT))
 frame_data = {i: [] for i in range(NODE_COUNT)}
-tx_index = 0
+sched_tx_index = 0   # used by scheduler
+current_tx_index = 0  # used by matrix
 last_frame_time = time.time()
 frame_id = 0
 
@@ -51,15 +52,18 @@ def plot_heatmap(grid):
 # SCHEDULER THREAD
 # -----------------------------
 def tx_scheduler():
-    global tx_index, frame_id
+    global sched_tx_index, frame_id
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while True:
-        msg = {"tx_node": NODE_IDS[tx_index], "frame_id": frame_id}
+        msg = {"tx_node": NODE_IDS[sched_tx_index], "frame_id": frame_id}
+        
+        print(f"[SCHED] TX node = {NODE_IDS[sched_tx_index]}")
+        
         data = json.dumps(msg).encode()
         for ip in SDR_IPS:
             sock.sendto(data, (ip, SCHED_PORT))
         # Next node
-        tx_index = (tx_index + 1) % NODE_COUNT
+        sched_tx_index = (sched_tx_index + 1) % NODE_COUNT
         frame_id += 1
         time.sleep(FRAME_TIME)
 
@@ -80,6 +84,9 @@ if __name__ == "__main__":
         try:
             data, addr = sock.recvfrom(1024)
             node_id, delta = struct.unpack("if", data)
+            
+            print(f"[RECV] from {addr} | Node {node_id} ΔRSSI={delta:.2f}")
+
             node_idx = node_id - 1
             frame_data[node_idx].append(delta)
         except BlockingIOError:
@@ -88,9 +95,17 @@ if __name__ == "__main__":
         # Rotate frames
         if now - last_frame_time >= FRAME_TIME:
             for rx in range(NODE_COUNT):
-                rssi_matrix[tx_index, rx] = np.mean(frame_data[rx]) if frame_data[rx] else 0.0
-            rssi_matrix[tx_index, tx_index] = 0.0
+                rssi_matrix[current_tx_index, rx] = np.mean(frame_data[rx]) if frame_data[rx] else 0.0
+
+            rssi_matrix[current_tx_index, current_tx_index] = 0.0
+
+            print("Matrix:")
+            print(rssi_matrix)
+            print(f"[FRAME DONE] TX was {current_tx_index+1}")
+
+            current_tx_index = (current_tx_index + 1) % NODE_COUNT
+
             frame_data = {i: [] for i in range(NODE_COUNT)}
             last_frame_time = now
-            # heatmap = reconstruct_rti(rssi_matrix)
+
             plot_heatmap(rssi_matrix)

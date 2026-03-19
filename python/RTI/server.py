@@ -12,10 +12,10 @@ import threading
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-NODE_COUNT = 2
+NODE_COUNT = 4
 NODE_IDS = list(range(1, NODE_COUNT + 1))
 
-SDR_IPS = ["192.168.20.35", "192.168.20.37"]
+SDR_IPS = ["192.168.20.35", "192.168.20.37", "192.168.20.32", "192.168.20.40"]
 
 FRAME_TIME = 0.05
 SERVER_PORT = 9000
@@ -23,14 +23,16 @@ SCHED_PORT = 9001
 
 GRID_X, GRID_Y = 20, 20
 LAMBDA = 0.1
-ALPHA = 0.3  # smoothing
+ALPHA = 0.3
 
 # -----------------------------
-# NODE POSITIONS (edit as needed)
+# NODE POSITIONS (perimeter layout - improved)
 # -----------------------------
 NODE_POS = {
     0: np.array([0, 0]),
-    1: np.array([3, 0]),
+    1: np.array([0, GRID_Y - 1]),
+    2: np.array([GRID_X - 1, 0]),
+    3: np.array([GRID_X - 1, GRID_Y - 1]),
 }
 
 # -----------------------------
@@ -46,7 +48,7 @@ last_frame_time = time.time()
 frame_id = 0
 
 # -----------------------------
-# BUILD W MATRIX (RTI MODEL)
+# BUILD W MATRIX (IMPROVED RTI MODEL)
 # -----------------------------
 def build_W():
     num_links = NODE_COUNT * NODE_COUNT
@@ -54,12 +56,12 @@ def build_W():
 
     W = np.zeros((num_links, num_pixels))
 
-    pixels = []
-    for i in range(GRID_X):
-        for j in range(GRID_Y):
-            pixels.append(np.array([i, j]))
+    # pixel coordinates
+    pixels = [np.array([i, j]) for i in range(GRID_X) for j in range(GRID_Y)]
 
     link_idx = 0
+
+    sigma = 2.0  # controls spatial spread sensitivity
 
     for tx in range(NODE_COUNT):
         for rx in range(NODE_COUNT):
@@ -71,15 +73,26 @@ def build_W():
             tx_pos = NODE_POS[tx]
             rx_pos = NODE_POS[rx]
 
-            d = np.linalg.norm(tx_pos - rx_pos)
+            d_link = np.linalg.norm(tx_pos - rx_pos)
+
+            weights = []
 
             for p_idx, p in enumerate(pixels):
                 d1 = np.linalg.norm(p - tx_pos)
                 d2 = np.linalg.norm(p - rx_pos)
 
-                # Ellipse model
-                if d1 + d2 <= d + 2:
-                    W[link_idx, p_idx] = 1.0
+                # excess path length
+                excess = (d1 + d2) - d_link
+
+                # Gaussian weighting
+                w = np.exp(- (excess ** 2) / (2 * sigma ** 2))
+
+                W[link_idx, p_idx] = w
+                weights.append(w)
+
+            # normalize row
+            row_sum = np.sum(W[link_idx]) + 1e-8
+            W[link_idx] /= row_sum
 
             link_idx += 1
 
@@ -88,12 +101,44 @@ def build_W():
 W = build_W()
 
 # -----------------------------
+# PLOTTING W
+# -----------------------------
+def plot_W_link(link_idx):
+    weights = W[link_idx].reshape(GRID_X, GRID_Y)
+
+    plt.figure()
+    plt.imshow(weights, cmap='viridis', interpolation='nearest')
+    plt.colorbar(label='Weight')
+    plt.title(f'W for Link {link_idx}')
+    plt.show()
+
+def plot_all_links():
+    plt.figure(figsize=(10, 10))
+
+    for i in range(W.shape[0]):
+        plt.subplot(NODE_COUNT, NODE_COUNT, i + 1)
+        plt.imshow(W[i].reshape(GRID_X, GRID_Y), cmap='viridis')
+        plt.axis('off')
+        plt.title(f'Link {i}')
+
+    plt.tight_layout()
+    plt.show()
+
+plot_all_links()
+
+# -----------------------------
 # RECONSTRUCTION
 # -----------------------------
 def reconstruct_rti(matrix):
     y = matrix.flatten()
 
-    x = np.linalg.inv(W.T @ W + LAMBDA * np.eye(W.shape[1])) @ W.T @ y
+    # center measurements (important)
+    y = y - np.mean(y)
+
+    WT = W.T
+    A = WT @ W + LAMBDA * np.eye(W.shape[1])
+
+    x = np.linalg.solve(A, WT @ y)
 
     return x.reshape(GRID_X, GRID_Y)
 
@@ -103,7 +148,7 @@ def reconstruct_rti(matrix):
 def plot_heatmap(grid):
     plt.clf()
     plt.imshow(grid, cmap='hot', interpolation='nearest')
-    plt.colorbar(label='ΔRSSI')
+    plt.colorbar(label='RTI Intensity')
     plt.title('RTI Heatmap')
     plt.pause(0.01)
 
@@ -112,10 +157,14 @@ def plot_heatmap(grid):
 # -----------------------------
 def tx_scheduler():
     global sched_tx_index, frame_id
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     while True:
-        msg = {"tx_node": NODE_IDS[sched_tx_index], "frame_id": frame_id}
+        msg = {
+            "tx_node": NODE_IDS[sched_tx_index],
+            "frame_id": frame_id
+        }
 
         print(f"[SCHED] TX node = {NODE_IDS[sched_tx_index]}")
 
@@ -152,7 +201,7 @@ if __name__ == "__main__":
             data, addr = sock.recvfrom(1024)
             node_id, delta = struct.unpack("if", data)
 
-            print(f"[RECV] from {addr} | Node {node_id} ΔRSSI={delta:.2f}")
+            print(f"[RECV] from {addr} | Node {node_id} ΔRSSI={delta:.3f}")
 
             node_idx = node_id - 1
             frame_data[node_idx].append(delta)
@@ -174,12 +223,11 @@ if __name__ == "__main__":
                 smoothed_matrix[current_tx_index, rx] = smoothed
                 rssi_matrix[current_tx_index, rx] = smoothed
 
-            # zero diagonal (no self-link)
             rssi_matrix[current_tx_index, current_tx_index] = 0.0
 
             print("Matrix:")
-            print(rssi_matrix)
-            print(f"[FRAME DONE] TX was {current_tx_index+1}")
+            print(np.round(rssi_matrix, 4))
+            print(f"[FRAME DONE] TX was {current_tx_index + 1}")
 
             current_tx_index = (current_tx_index + 1) % NODE_COUNT
 

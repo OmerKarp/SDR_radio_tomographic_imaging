@@ -8,6 +8,7 @@ import struct
 import time
 import threading
 import json
+import argparse
 
 # -----------------------------
 # RSSI SENDER BLOCK
@@ -38,7 +39,9 @@ class rssi_sender(gr.sync_block):
         rssi_samples = np.array(input_items[0], dtype=np.float32)
         now = time.time()
 
-        # Compute baseline
+        # -----------------------------
+        # BASELINE PHASE
+        # -----------------------------
         if self.baseline is None:
             self.baseline_sum += np.sum(rssi_samples)
             self.baseline_count += len(rssi_samples)
@@ -47,11 +50,15 @@ class rssi_sender(gr.sync_block):
                 print(f"Node {self.node_id} Baseline RSSI: {self.baseline:.2f}")
             return len(input_items[0])
 
-        # Compute ΔRSSI
+        # -----------------------------
+        # ΔRSSI COMPUTE
+        # -----------------------------
         delta = np.mean(rssi_samples) - self.baseline
         print(f"[NODE {self.node_id}] TX={self.is_tx} ΔRSSI={delta:.2f}")
 
-        # Send only if Tx
+        # -----------------------------
+        # SEND IF TX
+        # -----------------------------
         if self.is_tx and (now - self.last_send > 0.02):
             packet = struct.pack("if", self.node_id, delta)
             self.sock.sendto(packet, self.server)
@@ -65,27 +72,50 @@ class rssi_sender(gr.sync_block):
 def tx_listener(block, listen_port=9001):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("0.0.0.0", listen_port))
+
     while True:
         data, _ = sock.recvfrom(1024)
         msg = json.loads(data.decode())
         block.is_tx = (msg.get("tx_node") == block.node_id)
 
 # -----------------------------
+# SIMULATION MODE
+# -----------------------------
+def run_simulation(block):
+    print("Running in SIMULATION mode...")
+    while True:
+        fake_rssi = np.random.normal(-50 + block.node_id * 5, 1, 100)
+        block.work([fake_rssi], None)
+        time.sleep(0.01)
+
+# -----------------------------
+# REAL SDR MODE (HOOK)
+# -----------------------------
+def run_real():
+    print("Running in REAL SDR mode...")
+    while True:
+        time.sleep(1)  # idle (GNU Radio drives the block)
+
+# -----------------------------
 # MAIN
 # -----------------------------
 if __name__ == "__main__":
-    NODE_ID = int(input("Enter node ID (1 or 2): "))
-    SERVER_IP = input("Enter server IP: ")
 
-    block = rssi_sender(node_id=NODE_ID, server_ip=SERVER_IP)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--node_id", type=int, required=True)
+    parser.add_argument("--server_ip", type=str, required=True)
+    parser.add_argument("--mode", type=str, default="simulate", choices=["simulate", "real"])
+    args = parser.parse_args()
 
-    # Start scheduler listener thread
+    block = rssi_sender(
+        node_id=args.node_id,
+        server_ip=args.server_ip
+    )
+
+    # Start scheduler listener
     threading.Thread(target=tx_listener, args=(block,), daemon=True).start()
 
-    # Simulate incoming RSSI (replace with SDR input in GNURadio flow)
-    print("Node running... sending simulated RSSI.")
-    while True:
-        fake_rssi = np.random.normal(-50 + NODE_ID * 5, 1, 100)
-
-        block.work([fake_rssi], None)
-        time.sleep(0.01)
+    if args.mode == "simulate":
+        run_simulation(block)
+    else:
+        run_real()

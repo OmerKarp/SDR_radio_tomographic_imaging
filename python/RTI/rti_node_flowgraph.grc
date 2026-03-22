@@ -93,6 +93,18 @@ blocks:
     coordinate: [184, 16.0]
     rotation: 0
     state: enabled
+- name: scheduler_port
+  id: variable
+  parameters:
+    comment: ''
+    value: '"9001"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [384, 112.0]
+    rotation: 0
+    state: enabled
 - name: server_ip
   id: variable
   parameters:
@@ -114,19 +126,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [312, 112.0]
-    rotation: 0
-    state: enabled
-- name: tx_enable
-  id: variable
-  parameters:
-    comment: ''
-    value: '0'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [408, 112.0]
+    coordinate: [288, 112.0]
     rotation: 0
     state: enabled
 - name: RTI_rssi_sender_0
@@ -142,9 +142,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1024, 464.0]
+    coordinate: [936, 520.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: analog_sig_source_x_0
   id: analog_sig_source_x
   parameters:
@@ -165,7 +165,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [168, 248.0]
+    coordinate: [80, 248.0]
     rotation: 0
     state: enabled
 - name: blocks_complex_to_mag_squared_0
@@ -181,9 +181,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [408, 488.0]
+    coordinate: [320, 544.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_moving_average_xx_0
   id: blocks_moving_average_xx
   parameters:
@@ -201,27 +201,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [576, 456.0]
+    coordinate: [488, 512.0]
     rotation: 0
-    state: enabled
-- name: blocks_multiply_const_vxx_0
-  id: blocks_multiply_const_vxx
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    const: tx_enable
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    type: complex
-    vlen: '1'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [408, 288.0]
-    rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_multiply_const_vxx_0_0
   id: blocks_multiply_const_vxx
   parameters:
@@ -237,7 +219,25 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [864, 480.0]
+    coordinate: [776, 536.0]
+    rotation: 0
+    state: disabled
+- name: blocks_multiply_xx_0
+  id: blocks_multiply_xx
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_inputs: '2'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [352, 296.0]
     rotation: 0
     state: enabled
 - name: blocks_nlog10_ff_0
@@ -255,7 +255,99 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [752, 480.0]
+    coordinate: [664, 536.0]
+    rotation: 0
+    state: disabled
+- name: blocks_null_sink_0
+  id: blocks_null_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    bus_structure_sink: '[[0,],]'
+    comment: ''
+    num_inputs: '1'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [568, 184.0]
+    rotation: 0
+    state: enabled
+- name: epy_block_0
+  id: epy_block
+  parameters:
+    _source_code: "\"\"\"\nEmbedded Python Blocks:\n\nEach time this file is saved,\
+      \ GRC will instantiate the first class it finds\nto get ports and parameters\
+      \ of your block. The arguments to __init__  will\nbe the parameters. All of\
+      \ them are required to have default values!\n\"\"\"\n\nimport pmt\nimport json\n\
+      from gnuradio import gr\nimport numpy as np\n\nclass blk(gr.sync_block):\n \
+      \   def __init__(self, node_id=1):\n        gr.sync_block.__init__(self,\n \
+      \           name=\"tx_controller\",\n            in_sig=None,\n            out_sig=[np.complex64])\n\
+      \n        # -----------------------------\n        # PARAMETERS\n        # -----------------------------\n\
+      \        self.node_id = int(node_id)\n\n        # -----------------------------\n\
+      \        # MESSAGE INPUT (GRAY)\n        # -----------------------------\n \
+      \       self.message_port_register_in(pmt.intern(\"in\"))\n        self.set_msg_handler(pmt.intern(\"\
+      in\"), self.handle_msg)\n\n        # -----------------------------\n       \
+      \ # MESSAGE OUTPUT (GRAY)\n        # -----------------------------\n       \
+      \ self.message_port_register_out(pmt.intern(\"ctrl\"))\n\n        # Internal\
+      \ state\n        self.tx_enable = False\n        self.tx_node = None\n     \
+      \   self.frame_id = None\n    \n    def work(self, input_items, output_items):\n\
+      \        out = output_items[0]\n\n        value = 1.0 + 0j if self.tx_enable\
+      \ else 0.0 + 0j\n        out[:] = value\n\n        return len(out)\n\n    #\
+      \ -----------------------------\n    # MESSAGE HANDLER\n    # -----------------------------\n\
+      \    def handle_msg(self, msg):\n        try:\n            # Extract payload\
+      \ from PDU\n            payload = pmt.cdr(msg)\n            payload_bytes =\
+      \ pmt.to_python(payload)\n\n            # Decode JSON\n            json_str\
+      \ = bytes(payload_bytes).decode('utf-8')\n            data = json.loads(json_str)\n\
+      \n            # Extract scheduler info\n            self.tx_node = int(data.get(\"\
+      tx_node\", -1))\n            self.frame_id = int(data.get(\"frame_id\", -1))\n\
+      \n            # -----------------------------\n            # CONTROL LOGIC\n\
+      \            # -----------------------------\n            self.tx_enable = (self.tx_node\
+      \ == self.node_id)\n\n            print(f\"[NODE {self.node_id}] \"\n      \
+      \            f\"tx_node={self.tx_node}, \"\n                  f\"frame_id={self.frame_id},\
+      \ \"\n                  f\"tx_enable={self.tx_enable}\")\n\n            # -----------------------------\n\
+      \            # OUTPUT CONTROL MESSAGE\n            # -----------------------------\n\
+      \            ctrl_dict = {\n                \"tx_enable\": self.tx_enable,\n\
+      \                \"tx_node\": self.tx_node,\n                \"frame_id\": self.frame_id\n\
+      \            }\n            ctrl_pmt = pmt.to_pmt(ctrl_dict)\n            msg_out\
+      \ = pmt.cons(pmt.PMT_NIL, ctrl_pmt)\n\n            self.message_port_pub(pmt.intern(\"\
+      ctrl\"), msg_out)\n\n        except Exception as e:\n            print(f\"[TX_CTRL\
+      \ ERROR] {e}\")\n"
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    node_id: node_id
+  states:
+    _io_cache: ('tx_controller', 'blk', [('node_id', '1')], [('in', 'message', 1)],
+      [('0', 'complex', 1), ('ctrl', 'message', 1)], '', ['node_id'])
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [280, 408.0]
+    rotation: 0
+    state: enabled
+- name: network_socket_pdu_0
+  id: network_socket_pdu
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    host: 0.0.0.0
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    mtu: '10000'
+    port: scheduler_port
+    tcp_no_delay: 'False'
+    type: UDP_SERVER
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [88, 392.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_sink_0
@@ -532,9 +624,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [648, 240.0]
+    coordinate: [536, 256.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: uhd_usrp_source_0
   id: uhd_usrp_source
   parameters:
@@ -968,17 +1060,20 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [160, 456.0]
+    coordinate: [72, 512.0]
     rotation: 0
-    state: enabled
+    state: disabled
 
 connections:
-- [analog_sig_source_x_0, '0', blocks_multiply_const_vxx_0, '0']
+- [analog_sig_source_x_0, '0', blocks_multiply_xx_0, '0']
 - [blocks_complex_to_mag_squared_0, '0', blocks_moving_average_xx_0, '0']
 - [blocks_moving_average_xx_0, '0', blocks_nlog10_ff_0, '0']
-- [blocks_multiply_const_vxx_0, '0', uhd_usrp_sink_0, '0']
 - [blocks_multiply_const_vxx_0_0, '0', RTI_rssi_sender_0, '0']
+- [blocks_multiply_xx_0, '0', blocks_null_sink_0, '0']
+- [blocks_multiply_xx_0, '0', uhd_usrp_sink_0, '0']
 - [blocks_nlog10_ff_0, '0', blocks_multiply_const_vxx_0_0, '0']
+- [epy_block_0, '0', blocks_multiply_xx_0, '1']
+- [network_socket_pdu_0, pdus, epy_block_0, in]
 - [uhd_usrp_source_0, '0', blocks_complex_to_mag_squared_0, '0']
 
 metadata:

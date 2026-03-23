@@ -124,7 +124,7 @@ def plot_all_links():
     plt.tight_layout()
     plt.show()
 
-plot_all_links()
+# plot_all_links()
 
 # -----------------------------
 # RECONSTRUCTION

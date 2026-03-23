@@ -10,10 +10,12 @@
 # Copyright: OmerKarp
 # GNU Radio version: 3.10.9.2
 
+from gnuradio import RTI
 from gnuradio import analog
 from gnuradio import blocks
-from gnuradio import gr
+from gnuradio import channels
 from gnuradio.filter import firdes
+from gnuradio import gr
 from gnuradio.fft import window
 import sys
 import signal
@@ -49,17 +51,34 @@ class rti_node_flowgraph(gr.top_block):
 
         self.network_socket_pdu_0 = network.socket_pdu('UDP_SERVER', '0.0.0.0', scheduler_port, 10000, False)
         self.epy_block_0 = epy_block_0.blk(node_id=node_id)
-        self.blocks_null_sink_0 = blocks.null_sink(gr.sizeof_gr_complex*1)
+        self.channels_channel_model_0 = channels.channel_model(
+            noise_voltage=0.01,
+            frequency_offset=0.0,
+            epsilon=1.0,
+            taps=[1.0],
+            noise_seed=0,
+            block_tags=False)
+        self.blocks_nlog10_ff_0 = blocks.nlog10_ff(1, 1, 0)
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
+        self.blocks_multiply_const_vxx_0_0 = blocks.multiply_const_ff(10)
+        self.blocks_moving_average_xx_0 = blocks.moving_average_ff(4096, (1/4096), 4000, 1)
+        self.blocks_complex_to_mag_squared_0 = blocks.complex_to_mag_squared(1)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 10000, 0.5, 0, 0)
+        self.RTI_rssi_sender_0 = RTI.rssi_sender(node_id, server_ip, server_port)
 
 
         ##################################################
         # Connections
         ##################################################
+        self.msg_connect((self.epy_block_0, 'ctrl'), (self.RTI_rssi_sender_0, 'ctrl'))
         self.msg_connect((self.network_socket_pdu_0, 'pdus'), (self.epy_block_0, 'in'))
         self.connect((self.analog_sig_source_x_0, 0), (self.blocks_multiply_xx_0, 0))
-        self.connect((self.blocks_multiply_xx_0, 0), (self.blocks_null_sink_0, 0))
+        self.connect((self.blocks_complex_to_mag_squared_0, 0), (self.blocks_moving_average_xx_0, 0))
+        self.connect((self.blocks_moving_average_xx_0, 0), (self.blocks_nlog10_ff_0, 0))
+        self.connect((self.blocks_multiply_const_vxx_0_0, 0), (self.RTI_rssi_sender_0, 0))
+        self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
+        self.connect((self.blocks_nlog10_ff_0, 0), (self.blocks_multiply_const_vxx_0_0, 0))
+        self.connect((self.channels_channel_model_0, 0), (self.blocks_complex_to_mag_squared_0, 0))
         self.connect((self.epy_block_0, 0), (self.blocks_multiply_xx_0, 1))
 
 

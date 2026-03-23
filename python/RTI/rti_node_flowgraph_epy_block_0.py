@@ -44,7 +44,7 @@ class blk(gr.sync_block):
 
         value = 1.0 + 0j if self.tx_enable else 0.0 + 0j
         out[:] = value
-
+        
         return len(out)
 
     # -----------------------------

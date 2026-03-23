@@ -45,6 +45,7 @@ class rssi_sender(gr.sync_block):
         if self.baseline is None:
             self.baseline_sum += np.sum(rssi_samples)
             self.baseline_count += len(rssi_samples)
+            print("(+) Calibrating...")
             if now - self.start_time >= self.baseline_time:
                 self.baseline = self.baseline_sum / self.baseline_count
                 print(f"Node {self.node_id} Baseline RSSI: {self.baseline:.2f}")
@@ -89,22 +90,26 @@ def run_simulation(block):
         time.sleep(0.01)
 
 # -----------------------------
-# REAL SDR MODE (HOOK)
-# -----------------------------
-def run_real():
-    print("Running in REAL SDR mode...")
-    while True:
-        time.sleep(1)  # idle (GNU Radio drives the block)
-
-# -----------------------------
 # MAIN
 # -----------------------------
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--node_id", type=int, required=True)
-    parser.add_argument("--server_ip", type=str, required=True)
-    parser.add_argument("--mode", type=str, default="simulate", choices=["simulate", "real"])
+
+    parser.add_argument(
+        "--node_id",
+        type=int,
+        default=1,
+        help="Node ID (default: 1)"
+    )
+
+    parser.add_argument(
+        "--server_ip",
+        type=str,
+        default="192.168.20.35",
+        help="Server IP (default: 192.168.20.35)"
+    )
+
     args = parser.parse_args()
 
     block = rssi_sender(
@@ -115,7 +120,4 @@ if __name__ == "__main__":
     # Start scheduler listener
     threading.Thread(target=tx_listener, args=(block,), daemon=True).start()
 
-    if args.mode == "simulate":
-        run_simulation(block)
-    else:
-        run_real()
+    run_simulation(block)

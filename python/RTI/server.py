@@ -12,10 +12,10 @@ import threading
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-NODE_COUNT = 4
-NODE_IDS = list(range(1, NODE_COUNT + 1))
-
 SDR_IPS = ["192.168.20.35", "192.168.20.37", "192.168.20.32", "192.168.20.40"]
+
+NODE_COUNT = len(SDR_IPS)
+NODE_IDS = list(range(1, NODE_COUNT + 1))
 
 FRAME_TIME = 0.05
 SERVER_PORT = 9000

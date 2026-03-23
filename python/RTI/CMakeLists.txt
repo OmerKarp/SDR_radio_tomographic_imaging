@@ -19,7 +19,7 @@ add_subdirectory(bindings)
 ########################################################################
 # Install python sources
 ########################################################################
-gr_python_install(FILES __init__.py rssi_sender.py DESTINATION ${GR_PYTHON_DIR}/gnuradio/RTI)
+gr_python_install(FILES __init__.py rssi_sender.py tx_controller.py  DESTINATION ${GR_PYTHON_DIR}/gnuradio/RTI)
 
 ########################################################################
 # Handle the unit tests

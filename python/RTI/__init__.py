@@ -21,5 +21,6 @@ except ModuleNotFoundError:
 
 # import any pure python here
 from .rssi_sender import rssi_sender
+from .tx_controller import tx_controller
 
 #

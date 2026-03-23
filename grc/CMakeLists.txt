@@ -6,4 +6,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 install(FILES
-    RTI_rssi_sender.block.yml DESTINATION share/gnuradio/grc/blocks)
+    RTI_rssi_sender.block.yml
+    RTI_tx_controller.block.yml DESTINATION share/gnuradio/grc/blocks)

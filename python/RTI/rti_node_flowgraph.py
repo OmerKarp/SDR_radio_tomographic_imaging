@@ -23,7 +23,6 @@ from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
 from gnuradio import network
-import rti_node_flowgraph_epy_block_0 as epy_block_0  # embedded python block
 
 
 
@@ -50,7 +49,6 @@ class rti_node_flowgraph(gr.top_block):
         ##################################################
 
         self.network_socket_pdu_0 = network.socket_pdu('UDP_SERVER', '0.0.0.0', scheduler_port, 10000, False)
-        self.epy_block_0 = epy_block_0.blk(node_id=node_id)
         self.channels_channel_model_0 = channels.channel_model(
             noise_voltage=0.01,
             frequency_offset=0.0,
@@ -64,14 +62,16 @@ class rti_node_flowgraph(gr.top_block):
         self.blocks_moving_average_xx_0 = blocks.moving_average_ff(4096, (1/4096), 4000, 1)
         self.blocks_complex_to_mag_squared_0 = blocks.complex_to_mag_squared(1)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 10000, 0.5, 0, 0)
+        self.RTI_tx_controller_0 = RTI.tx_controller(node_id)
         self.RTI_rssi_sender_0 = RTI.rssi_sender(node_id, server_ip, server_port)
 
 
         ##################################################
         # Connections
         ##################################################
-        self.msg_connect((self.epy_block_0, 'ctrl'), (self.RTI_rssi_sender_0, 'ctrl'))
-        self.msg_connect((self.network_socket_pdu_0, 'pdus'), (self.epy_block_0, 'in'))
+        self.msg_connect((self.RTI_tx_controller_0, 'ctrl'), (self.RTI_rssi_sender_0, 'ctrl'))
+        self.msg_connect((self.network_socket_pdu_0, 'pdus'), (self.RTI_tx_controller_0, 'in'))
+        self.connect((self.RTI_tx_controller_0, 0), (self.blocks_multiply_xx_0, 1))
         self.connect((self.analog_sig_source_x_0, 0), (self.blocks_multiply_xx_0, 0))
         self.connect((self.blocks_complex_to_mag_squared_0, 0), (self.blocks_moving_average_xx_0, 0))
         self.connect((self.blocks_moving_average_xx_0, 0), (self.blocks_nlog10_ff_0, 0))
@@ -79,7 +79,6 @@ class rti_node_flowgraph(gr.top_block):
         self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
         self.connect((self.blocks_nlog10_ff_0, 0), (self.blocks_multiply_const_vxx_0_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_complex_to_mag_squared_0, 0))
-        self.connect((self.epy_block_0, 0), (self.blocks_multiply_xx_0, 1))
 
 
     def get_server_port(self):
@@ -112,7 +111,6 @@ class rti_node_flowgraph(gr.top_block):
 
     def set_node_id(self, node_id):
         self.node_id = node_id
-        self.epy_block_0.node_id = self.node_id
 
     def get_freq(self):
         return self.freq

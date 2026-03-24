@@ -12,10 +12,12 @@ import threading
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-SDR_IPS = ["192.168.20.35", "192.168.20.37", "192.168.20.32", "192.168.20.40"]
 
-NODE_COUNT = len(SDR_IPS)
+NODE_COUNT = 2
 NODE_IDS = list(range(1, NODE_COUNT + 1))
+
+SDR_IPS = ["192.168.20.35", "192.168.20.37", "192.168.20.32", "192.168.20.40"] # Me / Mor / Kiran / Gershi
+SDR_IPS = SDR_IPS[:NODE_COUNT]
 
 FRAME_TIME = 0.05
 SERVER_PORT = 9000
@@ -124,7 +126,7 @@ def plot_all_links():
     plt.tight_layout()
     plt.show()
 
-# plot_all_links()
+plot_all_links()
 
 # -----------------------------
 # RECONSTRUCTION

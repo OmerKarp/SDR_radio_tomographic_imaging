@@ -13,9 +13,8 @@
 from gnuradio import RTI
 from gnuradio import analog
 from gnuradio import blocks
-from gnuradio import channels
-from gnuradio.filter import firdes
 from gnuradio import gr
+from gnuradio.filter import firdes
 from gnuradio.fft import window
 import sys
 import signal
@@ -23,6 +22,8 @@ from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
 from gnuradio import network
+from gnuradio import uhd
+import time
 
 
 
@@ -36,7 +37,7 @@ class rti_node_flowgraph(gr.top_block):
         # Variables
         ##################################################
         self.server_port = server_port = 9000
-        self.server_ip = server_ip = "127.0.0.1"
+        self.server_ip = server_ip = "192.168.20.35"
         self.scheduler_port = scheduler_port = "9001"
         self.samp_rate = samp_rate = 1e6
         self.node_id = node_id = 1
@@ -48,14 +49,36 @@ class rti_node_flowgraph(gr.top_block):
         # Blocks
         ##################################################
 
+        self.uhd_usrp_source_0 = uhd.usrp_source(
+            ",".join(("", '')),
+            uhd.stream_args(
+                cpu_format="fc32",
+                args='',
+                channels=list(range(0,1)),
+            ),
+        )
+        self.uhd_usrp_source_0.set_samp_rate(samp_rate)
+        self.uhd_usrp_source_0.set_time_unknown_pps(uhd.time_spec(0))
+
+        self.uhd_usrp_source_0.set_center_freq(freq, 0)
+        self.uhd_usrp_source_0.set_antenna("RX2", 0)
+        self.uhd_usrp_source_0.set_gain(Rx_gain, 0)
+        self.uhd_usrp_sink_0 = uhd.usrp_sink(
+            ",".join(("", '')),
+            uhd.stream_args(
+                cpu_format="fc32",
+                args='',
+                channels=list(range(0,1)),
+            ),
+            "",
+        )
+        self.uhd_usrp_sink_0.set_samp_rate(samp_rate)
+        self.uhd_usrp_sink_0.set_time_unknown_pps(uhd.time_spec(0))
+
+        self.uhd_usrp_sink_0.set_center_freq(freq, 0)
+        self.uhd_usrp_sink_0.set_antenna("TX/RX", 0)
+        self.uhd_usrp_sink_0.set_gain(Tx_gain, 0)
         self.network_socket_pdu_0 = network.socket_pdu('UDP_SERVER', '0.0.0.0', scheduler_port, 10000, False)
-        self.channels_channel_model_0 = channels.channel_model(
-            noise_voltage=0.01,
-            frequency_offset=0.0,
-            epsilon=1.0,
-            taps=[1.0],
-            noise_seed=0,
-            block_tags=False)
         self.blocks_nlog10_ff_0 = blocks.nlog10_ff(1, 1, 0)
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
         self.blocks_multiply_const_vxx_0_0 = blocks.multiply_const_ff(10)
@@ -76,9 +99,9 @@ class rti_node_flowgraph(gr.top_block):
         self.connect((self.blocks_complex_to_mag_squared_0, 0), (self.blocks_moving_average_xx_0, 0))
         self.connect((self.blocks_moving_average_xx_0, 0), (self.blocks_nlog10_ff_0, 0))
         self.connect((self.blocks_multiply_const_vxx_0_0, 0), (self.RTI_rssi_sender_0, 0))
-        self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
+        self.connect((self.blocks_multiply_xx_0, 0), (self.uhd_usrp_sink_0, 0))
         self.connect((self.blocks_nlog10_ff_0, 0), (self.blocks_multiply_const_vxx_0_0, 0))
-        self.connect((self.channels_channel_model_0, 0), (self.blocks_complex_to_mag_squared_0, 0))
+        self.connect((self.uhd_usrp_source_0, 0), (self.blocks_complex_to_mag_squared_0, 0))
 
 
     def get_server_port(self):
@@ -105,6 +128,8 @@ class rti_node_flowgraph(gr.top_block):
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
         self.analog_sig_source_x_0.set_sampling_freq(self.samp_rate)
+        self.uhd_usrp_sink_0.set_samp_rate(self.samp_rate)
+        self.uhd_usrp_source_0.set_samp_rate(self.samp_rate)
 
     def get_node_id(self):
         return self.node_id
@@ -117,18 +142,22 @@ class rti_node_flowgraph(gr.top_block):
 
     def set_freq(self, freq):
         self.freq = freq
+        self.uhd_usrp_sink_0.set_center_freq(self.freq, 0)
+        self.uhd_usrp_source_0.set_center_freq(self.freq, 0)
 
     def get_Tx_gain(self):
         return self.Tx_gain
 
     def set_Tx_gain(self, Tx_gain):
         self.Tx_gain = Tx_gain
+        self.uhd_usrp_sink_0.set_gain(self.Tx_gain, 0)
 
     def get_Rx_gain(self):
         return self.Rx_gain
 
     def set_Rx_gain(self, Rx_gain):
         self.Rx_gain = Rx_gain
+        self.uhd_usrp_source_0.set_gain(self.Rx_gain, 0)
 
 
 

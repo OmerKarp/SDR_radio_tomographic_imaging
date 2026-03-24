@@ -102,14 +102,14 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [384, 112.0]
+    coordinate: [408, 112.0]
     rotation: 0
     state: enabled
 - name: server_ip
   id: variable
   parameters:
     comment: ''
-    value: '"127.0.0.1"'
+    value: '"192.168.20.35"'
   states:
     bus_sink: false
     bus_source: false
@@ -126,7 +126,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [288, 112.0]
+    coordinate: [312, 112.0]
     rotation: 0
     state: enabled
 - name: RTI_rssi_sender_0
@@ -294,7 +294,7 @@ blocks:
     bus_structure: null
     coordinate: [800, 408.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: network_socket_pdu_0
   id: network_socket_pdu
   parameters:
@@ -591,7 +591,7 @@ blocks:
     bus_structure: null
     coordinate: [616, 256.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: uhd_usrp_source_0
   id: uhd_usrp_source
   parameters:
@@ -1027,7 +1027,7 @@ blocks:
     bus_structure: null
     coordinate: [96, 592.0]
     rotation: 0
-    state: disabled
+    state: enabled
 
 connections:
 - [RTI_tx_controller_0, '0', blocks_multiply_xx_0, '1']
